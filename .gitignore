@@ -129,5 +129,5 @@ dmypy.json
 .pyre/
 
 # Project
-/secret.py
+secret.py
 /data/
