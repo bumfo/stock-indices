@@ -60,7 +60,7 @@ async def get_indice_lazy(session=None):
     async def get_fn(session=None):
         return await get_indice(codes=None, session=session)
 
-    return await get_lazy(get_fn, store='data/a_indice.json', session=session)
+    return await get_lazy(get_fn, store='data/a_indices.json', session=session)
 
 
 async def main():
