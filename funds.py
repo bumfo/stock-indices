@@ -42,6 +42,9 @@ async def get_lazy(get_fn, store=None, session=None):
 
         data = d['data']
 
+        if d['code'] != 0:
+            raise Exception('Invalid code: {}'.format(d))
+
         with open(store, 'w') as f:
             json.dump({'data': data, 'timestamp': datetime.utcnow().isoformat()}, f)
 
