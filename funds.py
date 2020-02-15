@@ -5,7 +5,7 @@ from datetime import timedelta
 
 from aiohttp import ClientSession
 
-from secret import LIXINGER_TOKEN, LIXINGER_METRICS
+from secret import LIXINGER_TOKEN, LIXINGER_METRICS, INTERESTING_CODES
 
 
 def get_dict_with_token():
@@ -123,15 +123,26 @@ async def get_indices_fundamental_lazy(codes, session=None):
     return ret
 
 
+def list_to_map(a, key):
+    m = {}
+
+    for d in a:
+        m[d[key]] = d
+
+    return m
+
+
 async def main():
     async with ClientSession() as session:
         indices = await get_indices_lazy(session=session)
 
-        print(indices[0])
+        code_info = list_to_map(indices, 'stockCode')
 
-        test = await get_indices_fundamental_lazy([indices[0]['stockCode']], session=session)
+        for code in INTERESTING_CODES:
+            print(code_info[code])
 
-        print(test[0][0])
+            d = await get_indices_fundamental_lazy([code], session=session)
+            print(d[0][0])
 
 
 if __name__ == '__main__':
