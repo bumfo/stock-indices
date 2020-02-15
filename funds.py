@@ -25,14 +25,6 @@ async def fetch_api(url, data, session):
     return json.loads(text)
 
 
-async def get_indice(codes=None, session=None):
-    data_req = get_dict_with_token()
-    if codes is not None:
-        data_req['stockCodes'] = codes
-
-    return await fetch_api('https://open.lixinger.com/api/a/indice', data_req, session=session)
-
-
 async def get_lazy(get_fn, store=None, session=None):
     data = None
     try:
@@ -54,6 +46,14 @@ async def get_lazy(get_fn, store=None, session=None):
             json.dump({'data': data, 'timestamp': datetime.utcnow().isoformat()}, f)
 
     return data
+
+
+async def get_indice(codes=None, session=None):
+    data_req = get_dict_with_token()
+    if codes is not None:
+        data_req['stockCodes'] = codes
+
+    return await fetch_api('https://open.lixinger.com/api/a/indice', data_req, session=session)
 
 
 async def get_indice_lazy(session=None):
