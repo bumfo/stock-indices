@@ -33,9 +33,8 @@ async def get_indice(codes=None, session=None):
     return await fetch_api('https://open.lixinger.com/api/a/indice', data_req, session=session)
 
 
-async def get_indice_lazy(session=None):
+async def get_lazy(get_fn, store=None, session=None):
     data = None
-    store = 'data/a_indice.json'
     try:
         with open(store, 'r') as f:
             d = json.load(f)
@@ -46,13 +45,22 @@ async def get_indice_lazy(session=None):
 
             data = d['data']
     except Exception as ex:
-        print('get_indice_lazy cache miss:', ex)
-        data = await get_indice(codes=None, session=session)
+        print(store, 'cache miss:', ex)
+        d = await get_fn(session=session)
+
+        data = d['data']
 
         with open(store, 'w') as f:
-            json.dump({'data': data['data'], 'timestamp': datetime.utcnow().isoformat()}, f)
+            json.dump({'data': data, 'timestamp': datetime.utcnow().isoformat()}, f)
 
     return data
+
+
+async def get_indice_lazy(session=None):
+    async def get_fn(session=None):
+        return await get_indice(codes=None, session=session)
+
+    return await get_lazy(get_fn, store='data/a_indice.json', session=session)
 
 
 async def main():
