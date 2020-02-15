@@ -1,1 +1,2 @@
 LIXINGER_TOKEN='XXX'
+LIXINGER_METRICS=['pe_ttm.weightedAvg']

@@ -5,7 +5,7 @@ from datetime import timedelta
 
 from aiohttp import ClientSession
 
-from secret import LIXINGER_TOKEN
+from secret import LIXINGER_TOKEN, LIXINGER_METRICS
 
 
 def get_dict_with_token():
@@ -22,36 +22,48 @@ async def async_post(url: str, session: ClientSession, **kwargs) -> str:
 
 async def fetch_api(url, data, session):
     text = await async_post(url, session, json=data)
-    return json.loads(text)
+    d = json.loads(text)
+
+    if d['code'] != 0:
+        raise Exception('Invalid code: {}'.format(d))
+
+    return d['data']
+
+
+def get_cache(store, days=14):
+    with open(store, 'r') as f:
+        d = json.load(f)
+
+        timestamp = datetime.fromisoformat(d['timestamp'])
+        if datetime.utcnow() - timestamp > timedelta(days=days):
+            raise Exception('too old')
+
+        return d['data']
+
+
+def write_cache(store, data):
+    import os
+    directory = os.path.dirname(store)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+    with open(store, 'w') as f:
+        json.dump({'data': data, 'timestamp': datetime.utcnow().isoformat()}, f)
 
 
 async def get_lazy(get_fn, store=None, session=None):
-    data = None
     try:
-        with open(store, 'r') as f:
-            d = json.load(f)
-
-            timestamp = datetime.fromisoformat(d['timestamp'])
-            if datetime.utcnow() - timestamp > timedelta(days=14):
-                raise Exception('too old')
-
-            data = d['data']
+        data = get_cache(store)
     except Exception as ex:
         print(store, 'cache miss:', ex)
-        d = await get_fn(session=session)
+        data = await get_fn(session=session)
 
-        data = d['data']
-
-        if d['code'] != 0:
-            raise Exception('Invalid code: {}'.format(d))
-
-        with open(store, 'w') as f:
-            json.dump({'data': data, 'timestamp': datetime.utcnow().isoformat()}, f)
+        write_cache(store, data)
 
     return data
 
 
-async def get_indice(codes=None, session=None):
+async def get_indices(codes=None, session=None):
     data_req = get_dict_with_token()
     if codes is not None:
         data_req['stockCodes'] = codes
@@ -59,16 +71,67 @@ async def get_indice(codes=None, session=None):
     return await fetch_api('https://open.lixinger.com/api/a/indice', data_req, session=session)
 
 
-async def get_indice_lazy(session=None):
+async def get_indices_lazy(session=None):
     async def get_fn(session=None):
-        return await get_indice(codes=None, session=session)
+        return await get_indices(codes=None, session=session)
 
     return await get_lazy(get_fn, store='data/a_indices.json', session=session)
 
 
+async def get_indices_fundamental(codes, metrics, latest=True, session=None):
+    data_req = get_dict_with_token()
+
+    data_req['stockCodes'] = codes
+    data_req['metrics'] = metrics
+
+    if latest:
+        data_req['date'] = 'latest'
+        if len(codes) > 100:
+            raise Exception('get_indices_fundamental: at most 100 allowed, {} passed', len(codes))
+    else:
+        data_req['startDate'] = '1900-01-01'
+        if len(codes) != 1:
+            raise Exception('get_indices_fundamental: at most 100 allowed in full mode, {} passed', len(codes))
+
+    return await fetch_api('https://open.lixinger.com/api/a/indice/fundamental', data_req, session=session)
+
+
+def indices_fundamental_store(code):
+    return 'data/a_indices_fundamental/{}.json'.format(code)
+
+
+async def get_indices_fundamental_lazy(codes, session=None):
+    missing = []
+    old = []
+
+    ret = []
+
+    for code in codes:
+        try:
+            data = get_cache(indices_fundamental_store(code), days=10)
+            ret.append(data)
+        except Exception as ex:
+            print('indices_fundamental', code, 'cache miss:', ex)
+            missing.append(code)
+
+    for code in missing:
+        data = await get_indices_fundamental([code], LIXINGER_METRICS, latest=False, session=session)
+        write_cache(indices_fundamental_store(code), data)
+
+        ret.append(data)
+
+    return ret
+
+
 async def main():
     async with ClientSession() as session:
-        print(await get_indice_lazy(session=session))
+        indices = await get_indices_lazy(session=session)
+
+        print(indices[0])
+
+        test = await get_indices_fundamental_lazy([indices[0]['stockCode']], session=session)
+
+        print(test[0][0])
 
 
 if __name__ == '__main__':
