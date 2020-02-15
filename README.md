@@ -1,4 +1,4 @@
-# public-fund
+# public-funds
 Retrieve fund data
 
 1. rename secret.default.py to secret.py
