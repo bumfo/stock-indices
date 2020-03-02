@@ -7,7 +7,7 @@ from typing import Union
 
 from aiohttp import ClientSession
 
-from secret import LIXINGER_TOKEN, LIXINGER_METRICS, INTERESTING_CODES
+from secret import LIXINGER_TOKEN, LIXINGER_METRICS, INTERESTING_CODES, MY_INDICATOR
 
 
 def get_dict_with_token():
@@ -226,8 +226,8 @@ async def main():
 
         data = await get_indices_fundamental_lazy(INTERESTING_CODES, session=session)
         for code, d in zip(INTERESTING_CODES, data):
-            print(code_info[code])
-            print(d[0])
+            info = code_info[code]
+            print(info['stockCode'], info['name'], MY_INDICATOR(d))
 
 
 if __name__ == '__main__':
