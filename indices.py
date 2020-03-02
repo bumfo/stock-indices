@@ -1,8 +1,9 @@
 import asyncio
 import json
-from datetime import date
-from datetime import datetime
+from collections import defaultdict
+from datetime import datetime, date
 from datetime import timedelta
+from typing import Union
 
 from aiohttp import ClientSession
 
@@ -82,14 +83,14 @@ async def get_indices_lazy(session=None):
     return await get_lazy(get_fn, store='data/a_indices.json', session=session)
 
 
-async def get_indices_fundamental(codes, metrics, latest=True, session=None):
+async def get_indices_fundamental(codes, metrics, latest: Union[bool, date] = True, session=None):
     data_req = get_dict_with_token()
 
     data_req['stockCodes'] = codes
     data_req['metrics'] = metrics
 
     if latest:
-        data_req['date'] = 'latest' if latest is True else latest
+        data_req['date'] = 'latest' if latest is True else latest.isoformat()
         if len(codes) > 100:
             raise Exception('get_indices_fundamental: at most 100 allowed, {} passed', len(codes))
     else:
@@ -122,6 +123,7 @@ async def get_indices_fundamental_lazy(codes, session=None):
 
     for code in missing:
         data = await get_indices_fundamental([code], LIXINGER_METRICS, latest=False, session=session)
+        sort_data(data, reverse=True)
         write_cache(indices_fundamental_store(code), data, timestamp=now)
 
         code_data[code] = data
@@ -137,16 +139,74 @@ async def get_indices_fundamental_lazy(codes, session=None):
         raise Exception('Up to 100 supported by get_indices_fundamental_lazy')
 
     if len(old_codes) > 0:
-        print("updating outdated codes:", old_codes)
-        data = await get_indices_fundamental(old_codes, LIXINGER_METRICS, latest=True, session=session)
+        update_data = []
 
-        print(data)
+        now_date = now.date()
+        oldest = now_date
+
+        for code in old_codes:
+            data = code_data[code]
+            if len(data) > 0:
+                code_date = datetime.fromisoformat(data[0]['date']).date()
+
+                if code_date < oldest:
+                    oldest = code_date
+
+        if oldest < now_date:
+            print("updating outdated codes:", old_codes)
+
+            d = oldest + timedelta(days=1)
+            while d < now_date:
+                print('fetch', d)
+                data = await get_indices_fundamental(old_codes, LIXINGER_METRICS, latest=d, session=session)
+                update_data.extend(data)
+
+                d += timedelta(days=1)
+
+            print('fetch', 'latest')
+
+            data = await get_indices_fundamental(old_codes, LIXINGER_METRICS, latest=True, session=session)
+            update_data.extend(data)
+
+            # print(update_data)
+
+            merge_data(code_data, update_data)
+
+            for code in old_codes:
+                data = code_data[code]
+                write_cache(indices_fundamental_store(code), data, timestamp=now)
 
     ret = []
     for code in codes:
         ret.append(code_data[code])
 
     return ret
+
+
+def sort_data(data: list, reverse=False):
+    data.sort(key=lambda x: datetime.fromisoformat(x['date']), reverse=reverse)
+
+
+def merge_data(code_data, update_data):
+    code_update = defaultdict(list)
+
+    for d in update_data:
+        code_update[d['stockCode']].append(d)
+
+    for code, d in code_update.items():
+        sort_data(d)
+
+        data: list = code_data[code]
+        data.reverse()
+
+        first = datetime.fromisoformat(d[0]['date']).date()
+
+        while len(data) > 0 and datetime.fromisoformat(data[-1]['date']).date() >= first:
+            print('pop', code, data.pop()['date'])
+
+        data.extend(d)
+
+        data.reverse()
 
 
 def list_to_map(a, key):
@@ -164,11 +224,10 @@ async def main():
 
         code_info = list_to_map(indices, 'stockCode')
 
-        for code in INTERESTING_CODES:
+        data = await get_indices_fundamental_lazy(INTERESTING_CODES, session=session)
+        for code, d in zip(INTERESTING_CODES, data):
             print(code_info[code])
-
-            d = await get_indices_fundamental_lazy([code], session=session)
-            print(d[0][0])
+            print(d[0])
 
 
 if __name__ == '__main__':
