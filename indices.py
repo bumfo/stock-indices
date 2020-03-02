@@ -232,7 +232,7 @@ async def main():
         data = await get_indices_fundamental_lazy(INTERESTING_CODES, session=session)
         for code, d in zip(INTERESTING_CODES, data):
             info = code_info[code]
-            print('{}\t{}\t{}'.format(info['stockCode'], info['name'], MY_INDICATOR(d)))
+            print('{}\t{}\t{}\t{}'.format(info['stockCode'], info['name'], MY_INDICATOR(d), datetime.fromisoformat(d[0]['date']).date()))
 
 
 if __name__ == '__main__':
