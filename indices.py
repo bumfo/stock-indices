@@ -1,5 +1,6 @@
 import asyncio
 import json
+from datetime import date
 from datetime import datetime
 from datetime import timedelta
 
@@ -38,22 +39,25 @@ def get_cache(store, days=14):
         if datetime.utcnow() - timestamp > timedelta(days=days):
             raise Exception('too old')
 
-        return d['data']
+        return d['data'], timestamp
 
 
-def write_cache(store, data):
+def write_cache(store, data, timestamp=None):
+    if timestamp is None:
+        timestamp = datetime.utcnow()
+
     import os
     directory = os.path.dirname(store)
     if not os.path.exists(directory):
         os.makedirs(directory)
 
     with open(store, 'w') as f:
-        json.dump({'data': data, 'timestamp': datetime.utcnow().isoformat()}, f)
+        json.dump({'data': data, 'timestamp': timestamp.isoformat()}, f)
 
 
 async def get_lazy(get_fn, store=None, session=None):
     try:
-        data = get_cache(store)
+        data, _ = get_cache(store)
     except Exception as ex:
         print(store, 'cache miss:', ex)
         data = await get_fn(session=session)
@@ -85,7 +89,7 @@ async def get_indices_fundamental(codes, metrics, latest=True, session=None):
     data_req['metrics'] = metrics
 
     if latest:
-        data_req['date'] = 'latest'
+        data_req['date'] = 'latest' if latest is True else latest
         if len(codes) > 100:
             raise Exception('get_indices_fundamental: at most 100 allowed, {} passed', len(codes))
     else:
@@ -101,24 +105,46 @@ def indices_fundamental_store(code):
 
 
 async def get_indices_fundamental_lazy(codes, session=None):
-    missing = []
-    old = []
+    now = datetime.utcnow()
 
-    ret = []
+    missing = []
+    code_data = {}
+    code_time = {}
 
     for code in codes:
         try:
-            data = get_cache(indices_fundamental_store(code), days=10)
-            ret.append(data)
+            data, timestamp = get_cache(indices_fundamental_store(code), days=10)
+            code_data[code] = data
+            code_time[code] = timestamp
         except Exception as ex:
             print('indices_fundamental', code, 'cache miss:', ex)
             missing.append(code)
 
     for code in missing:
         data = await get_indices_fundamental([code], LIXINGER_METRICS, latest=False, session=session)
-        write_cache(indices_fundamental_store(code), data)
+        write_cache(indices_fundamental_store(code), data, timestamp=now)
 
-        ret.append(data)
+        code_data[code] = data
+        code_time[code] = now
+
+    old_codes = []
+
+    for code, t in code_time.items():
+        if now - t > timedelta(hours=7):
+            old_codes.append(code)
+
+    if len(old_codes) > 100:
+        raise Exception('Up to 100 supported by get_indices_fundamental_lazy')
+
+    if len(old_codes) > 0:
+        print("updating outdated codes:", old_codes)
+        data = await get_indices_fundamental(old_codes, LIXINGER_METRICS, latest=True, session=session)
+
+        print(data)
+
+    ret = []
+    for code in codes:
+        ret.append(code_data[code])
 
     return ret
 
