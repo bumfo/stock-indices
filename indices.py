@@ -1,5 +1,6 @@
 import asyncio
 import json
+import sys
 from collections import defaultdict
 from datetime import datetime, date
 from datetime import timedelta
@@ -8,6 +9,10 @@ from typing import Union
 from aiohttp import ClientSession
 
 from secret import LIXINGER_TOKEN, LIXINGER_METRICS, INTERESTING_CODES, MY_INDICATOR
+
+
+def eprint(*args):
+    print(*args, file=sys.stderr)
 
 
 def get_dict_with_token():
@@ -60,7 +65,7 @@ async def get_lazy(get_fn, store=None, session=None):
     try:
         data, _ = get_cache(store)
     except Exception as ex:
-        print(store, 'cache miss:', ex)
+        eprint(store, 'cache miss:', ex)
         data = await get_fn(session=session)
 
         write_cache(store, data)
@@ -118,7 +123,7 @@ async def get_indices_fundamental_lazy(codes, session=None):
             code_data[code] = data
             code_time[code] = timestamp
         except Exception as ex:
-            print('indices_fundamental', code, 'cache miss:', ex)
+            eprint('indices_fundamental', code, 'cache miss:', ex)
             missing.append(code)
 
     for code in missing:
@@ -153,22 +158,22 @@ async def get_indices_fundamental_lazy(codes, session=None):
                     oldest = code_date
 
         if oldest < now_date:
-            print("updating outdated codes:", old_codes)
+            eprint("updating outdated codes:", old_codes)
 
             d = oldest + timedelta(days=1)
             while d < now_date:
-                print('fetch', d)
+                eprint('fetch', d)
                 data = await get_indices_fundamental(old_codes, LIXINGER_METRICS, latest=d, session=session)
                 update_data.extend(data)
 
                 d += timedelta(days=1)
 
-            print('fetch', 'latest')
+            eprint('fetch', 'latest')
 
             data = await get_indices_fundamental(old_codes, LIXINGER_METRICS, latest=True, session=session)
             update_data.extend(data)
 
-            # print(update_data)
+            # eprint(update_data)
 
             merge_data(code_data, update_data)
 
@@ -202,7 +207,7 @@ def merge_data(code_data, update_data):
         first = datetime.fromisoformat(d[0]['date']).date()
 
         while len(data) > 0 and datetime.fromisoformat(data[-1]['date']).date() >= first:
-            print('pop', code, data.pop()['date'])
+            eprint('pop', code, data.pop()['date'])
 
         data.extend(d)
 
