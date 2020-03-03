@@ -137,11 +137,8 @@ async def get_indices_fundamental_lazy(codes, session=None):
     old_codes = []
 
     for code, t in code_time.items():
-        if now - t > timedelta(hours=7):
+        if now - t > timedelta(hours=1):
             old_codes.append(code)
-
-    if len(old_codes) > 100:
-        raise Exception('Up to 100 supported by get_indices_fundamental_lazy')
 
     if len(old_codes) > 0:
         update_data = []
@@ -149,37 +146,46 @@ async def get_indices_fundamental_lazy(codes, session=None):
         now_date = now.date()
         oldest = now_date
 
+        outdated_codes = []
+
         for code in old_codes:
             data = code_data[code]
             if len(data) > 0:
                 code_date = datetime.fromisoformat(data[0]['date']).date()
 
+                if code_date < now_date:
+                    outdated_codes.append(code)
+
                 if code_date < oldest:
                     oldest = code_date
 
-        if oldest < now_date:
-            eprint("updating outdated codes:", old_codes)
+        if len(outdated_codes) > 100:
+            raise Exception('Up to 100 supported by get_indices_fundamental_lazy')
+
+        if len(outdated_codes) > 0 and oldest < now_date:
+            eprint("updating outdated codes:", outdated_codes)
 
             d = oldest + timedelta(days=1)
             while d < now_date:
                 eprint('fetch', d)
-                data = await get_indices_fundamental(old_codes, LIXINGER_METRICS, latest=d, session=session)
+                data = await get_indices_fundamental(outdated_codes, LIXINGER_METRICS, latest=d, session=session)
                 update_data.extend(data)
 
                 d += timedelta(days=1)
 
             eprint('fetch', 'latest')
 
-            data = await get_indices_fundamental(old_codes, LIXINGER_METRICS, latest=True, session=session)
+            data = await get_indices_fundamental(outdated_codes, LIXINGER_METRICS, latest=True, session=session)
             update_data.extend(data)
 
-            # eprint(update_data)
+            if len(update_data) > 0:
+                # eprint(update_data)
 
-            merge_data(code_data, update_data)
+                merge_data(code_data, update_data)
 
-            for code in old_codes:
-                data = code_data[code]
-                write_cache(indices_fundamental_store(code), data, timestamp=now)
+                for code in outdated_codes:
+                    data = code_data[code]
+                    write_cache(indices_fundamental_store(code), data, timestamp=now)
 
     ret = []
     for code in codes:
