@@ -19,6 +19,10 @@ def get_dict_with_token():
     return {'token': LIXINGER_TOKEN}
 
 
+def data_date(s: str) -> date:
+    return datetime.fromisoformat(s).date()
+
+
 async def async_post(url: str, session: ClientSession, **kwargs) -> str:
     async with session.post(url, **kwargs) as resp:
         if resp.status == 200:
@@ -151,7 +155,7 @@ async def get_indices_fundamental_lazy(codes, session=None):
         for code in old_codes:
             data = code_data[code]
             if len(data) > 0:
-                code_date = datetime.fromisoformat(data[0]['date']).date()
+                code_date = data_date(data[0]['date'])
 
                 if code_date < now_date:
                     outdated_codes.append(code)
@@ -195,7 +199,7 @@ async def get_indices_fundamental_lazy(codes, session=None):
 
 
 def sort_data(data: list, reverse=False):
-    data.sort(key=lambda x: datetime.fromisoformat(x['date']), reverse=reverse)
+    data.sort(key=lambda x: data_date(x['date']), reverse=reverse)
 
 
 def merge_data(code_data, update_data):
@@ -210,9 +214,9 @@ def merge_data(code_data, update_data):
         data: list = code_data[code]
         data.reverse()
 
-        first = datetime.fromisoformat(d[0]['date']).date()
+        first = data_date(d[0]['date'])
 
-        while len(data) > 0 and datetime.fromisoformat(data[-1]['date']).date() >= first:
+        while len(data) > 0 and data_date(data[-1]['date']) >= first:
             eprint('pop', code, data.pop()['date'])
 
         data.extend(d)
@@ -238,7 +242,7 @@ async def main():
         data = await get_indices_fundamental_lazy(INTERESTING_CODES, session=session)
         for code, d in zip(INTERESTING_CODES, data):
             info = code_info[code]
-            print('{}\t{}\t{}\t{}'.format(info['stockCode'], info['name'], MY_INDICATOR(d), datetime.fromisoformat(d[0]['date']).date()))
+            print('{}\t{}\t{}\t{}'.format(info['stockCode'], info['name'], MY_INDICATOR(d), data_date(d[0]['date'])))
 
 
 if __name__ == '__main__':
