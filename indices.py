@@ -182,14 +182,11 @@ async def get_indices_fundamental_lazy(codes, session=None):
             data = await get_indices_fundamental(outdated_codes, LIXINGER_METRICS, latest=True, session=session)
             update_data.extend(data)
 
-            if len(update_data) > 0:
-                # eprint(update_data)
+            merge_data(code_data, update_data)
 
-                merge_data(code_data, update_data)
-
-                for code in outdated_codes:
-                    data = code_data[code]
-                    write_cache(indices_fundamental_store(code), data, timestamp=now)
+            for code in outdated_codes:
+                data = code_data[code]
+                write_cache(indices_fundamental_store(code), data, timestamp=now)
 
     ret = []
     for code in codes:
