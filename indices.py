@@ -62,7 +62,7 @@ def write_cache(store, data, timestamp=None):
         os.makedirs(directory)
 
     with open(store, 'w') as f:
-        json.dump({'data': data, 'timestamp': timestamp.isoformat()}, f)
+        json.dump({'data': data, 'timestamp': timestamp.isoformat()}, f, indent=2, sort_keys=True, ensure_ascii=False)
 
 
 async def get_lazy(get_fn, store=None, session=None):
