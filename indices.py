@@ -8,7 +8,7 @@ from typing import Union
 
 from aiohttp import ClientSession
 
-from secret import LIXINGER_TOKEN, LIXINGER_METRICS, INTERESTING_CODES, MY_INDICATOR, API_LIXINGER_INDEX, API_LIXINGER_INDEX_FUNDAMENTAL
+from secret import LIXINGER_TOKEN, LIXINGER_METRICS_LIST, INTERESTING_CODES, MY_INDICATOR, API_LIXINGER_INDEX, API_LIXINGER_INDEX_FUNDAMENTAL
 
 
 def eprint(*args):
@@ -92,11 +92,11 @@ async def get_indices_lazy(session=None):
     return await get_lazy(get_fn, store='data/a_indices.json', session=session)
 
 
-async def get_indices_fundamental(codes, metrics, latest: Union[bool, date] = True, session=None):
+async def get_indices_fundamental(codes, metricsList, latest: Union[bool, date] = True, session=None):
     data_req = get_dict_with_token()
 
     data_req['stockCodes'] = codes
-    data_req['metrics'] = metrics
+    data_req['metricsList'] = metricsList
 
     if latest:
         data_req['date'] = 'latest' if latest is True else latest.isoformat()
@@ -131,7 +131,7 @@ async def get_indices_fundamental_lazy(codes, session=None):
             missing.append(code)
 
     for code in missing:
-        data = await get_indices_fundamental([code], LIXINGER_METRICS, latest=False, session=session)
+        data = await get_indices_fundamental([code], LIXINGER_METRICS_LIST, latest=False, session=session)
         sort_data(data, reverse=True)
         write_cache(indices_fundamental_store(code), data, timestamp=now)
 
@@ -172,14 +172,14 @@ async def get_indices_fundamental_lazy(codes, session=None):
             d = oldest + timedelta(days=1)
             while d < now_date:
                 eprint('fetch', d)
-                data = await get_indices_fundamental(outdated_codes, LIXINGER_METRICS, latest=d, session=session)
+                data = await get_indices_fundamental(outdated_codes, LIXINGER_METRICS_LIST, latest=d, session=session)
                 update_data.extend(data)
 
                 d += timedelta(days=1)
 
             eprint('fetch', 'latest')
 
-            data = await get_indices_fundamental(outdated_codes, LIXINGER_METRICS, latest=True, session=session)
+            data = await get_indices_fundamental(outdated_codes, LIXINGER_METRICS_LIST, latest=True, session=session)
             update_data.extend(data)
 
             merge_data(code_data, update_data)
