@@ -8,7 +8,7 @@ from typing import Union
 
 from aiohttp import ClientSession
 
-from secret import LIXINGER_TOKEN, LIXINGER_METRICS, INTERESTING_CODES, MY_INDICATOR
+from secret import LIXINGER_TOKEN, LIXINGER_METRICS, INTERESTING_CODES, MY_INDICATOR, API_LIXINGER_INDEX, API_LIXINGER_INDEX_FUNDAMENTAL
 
 
 def eprint(*args):
@@ -82,7 +82,7 @@ async def get_indices(codes=None, session=None):
     if codes is not None:
         data_req['stockCodes'] = codes
 
-    return await fetch_api('https://open.lixinger.com/api/a/indice', data_req, session=session)
+    return await fetch_api(API_LIXINGER_INDEX, data_req, session=session)
 
 
 async def get_indices_lazy(session=None):
@@ -107,7 +107,7 @@ async def get_indices_fundamental(codes, metrics, latest: Union[bool, date] = Tr
         if len(codes) != 1:
             raise Exception('get_indices_fundamental: at most 100 allowed in full mode, {} passed', len(codes))
 
-    return await fetch_api('https://open.lixinger.com/api/a/indice/fundamental', data_req, session=session)
+    return await fetch_api(API_LIXINGER_INDEX_FUNDAMENTAL, data_req, session=session)
 
 
 def indices_fundamental_store(code):
