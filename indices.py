@@ -77,22 +77,22 @@ async def get_lazy(get_fn, store=None, session=None):
     return data
 
 
-async def get_indices(codes=None, session=None):
+async def get_indices(codes=None, market_code=None, session=None):
     data_req = get_dict_with_token()
     if codes is not None:
         data_req['stockCodes'] = codes
 
-    return await fetch_api(API_LIXINGER_INDEX, data_req, session=session)
+    return await fetch_api(API_LIXINGER_INDEX.format(market_code=market_code), data_req, session=session)
 
 
-async def get_indices_lazy(session=None):
+async def get_indices_lazy(market_code='a', session=None):
     async def get_fn(session=None):
-        return await get_indices(codes=None, session=session)
+        return await get_indices(codes=None, market_code=market_code, session=session)
 
-    return await get_lazy(get_fn, store='data/a_indices.json', session=session)
+    return await get_lazy(get_fn, store='data/{market_code}_indices.json'.format(market_code=market_code), session=session)
 
 
-async def get_indices_fundamental(codes, metricsList, latest: Union[bool, date] = True, session=None):
+async def get_indices_fundamental(codes, metricsList, market_code=None, latest: Union[bool, date] = True, session=None):
     data_req = get_dict_with_token()
 
     data_req['stockCodes'] = codes
@@ -107,14 +107,14 @@ async def get_indices_fundamental(codes, metricsList, latest: Union[bool, date] 
         if len(codes) != 1:
             raise Exception('get_indices_fundamental: at most 100 allowed in full mode, {} passed', len(codes))
 
-    return await fetch_api(API_LIXINGER_INDEX_FUNDAMENTAL, data_req, session=session)
+    return await fetch_api(API_LIXINGER_INDEX_FUNDAMENTAL.format(market_code=market_code), data_req, session=session)
 
 
-def indices_fundamental_store(code):
-    return 'data/a_indices_fundamental/{}.json'.format(code)
+def indices_fundamental_store(code, market_code=None):
+    return 'data/{market_code}_indices_fundamental/{stock_code}.json'.format(market_code=market_code, stock_code=code)
 
 
-async def get_indices_fundamental_lazy(codes, session=None):
+async def get_indices_fundamental_lazy(codes, market_code='a', session=None):
     now = datetime.utcnow()
 
     missing = []
@@ -123,7 +123,7 @@ async def get_indices_fundamental_lazy(codes, session=None):
 
     for code in codes:
         try:
-            data, timestamp = get_cache(indices_fundamental_store(code), days=10)
+            data, timestamp = get_cache(indices_fundamental_store(code, market_code=market_code), days=10)
             code_data[code] = data
             code_time[code] = timestamp
         except Exception as ex:
@@ -131,9 +131,9 @@ async def get_indices_fundamental_lazy(codes, session=None):
             missing.append(code)
 
     for code in missing:
-        data = await get_indices_fundamental([code], LIXINGER_METRICS_LIST, latest=False, session=session)
+        data = await get_indices_fundamental([code], LIXINGER_METRICS_LIST, market_code=market_code, latest=False, session=session)
         sort_data(data, reverse=True)
-        write_cache(indices_fundamental_store(code), data, timestamp=now)
+        write_cache(indices_fundamental_store(code, market_code=market_code), data, timestamp=now)
 
         code_data[code] = data
         code_time[code] = now
@@ -172,21 +172,21 @@ async def get_indices_fundamental_lazy(codes, session=None):
             d = oldest + timedelta(days=1)
             while d < now_date:
                 eprint('fetch', d)
-                data = await get_indices_fundamental(outdated_codes, LIXINGER_METRICS_LIST, latest=d, session=session)
+                data = await get_indices_fundamental(outdated_codes, LIXINGER_METRICS_LIST, market_code=market_code, latest=d, session=session)
                 update_data.extend(data)
 
                 d += timedelta(days=1)
 
             eprint('fetch', 'latest')
 
-            data = await get_indices_fundamental(outdated_codes, LIXINGER_METRICS_LIST, latest=True, session=session)
+            data = await get_indices_fundamental(outdated_codes, LIXINGER_METRICS_LIST, market_code=market_code, latest=True, session=session)
             update_data.extend(data)
 
             merge_data(code_data, update_data)
 
             for code in outdated_codes:
                 data = code_data[code]
-                write_cache(indices_fundamental_store(code), data, timestamp=now)
+                write_cache(indices_fundamental_store(code, market_code=market_code), data, timestamp=now)
 
     ret = []
     for code in codes:
