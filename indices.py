@@ -8,7 +8,7 @@ from typing import Union
 
 from aiohttp import ClientSession
 
-from secret import LIXINGER_TOKEN, LIXINGER_METRICS_LIST, INTERESTING_CODES, MY_INDICATOR, API_LIXINGER_INDEX, API_LIXINGER_INDEX_FUNDAMENTAL
+from secret import LIXINGER_TOKEN, LIXINGER_METRICS_LIST, MY_CODES, API_LIXINGER_INDEX, API_LIXINGER_INDEX_FUNDAMENTAL
 
 
 def eprint(*args):
@@ -232,14 +232,20 @@ def list_to_map(a, key):
 
 async def main():
     async with ClientSession() as session:
-        indices = await get_indices_lazy(session=session)
+        code_info = {}
+        for market_code in ('a', 'h', 'us'):
+            indices = await get_indices_lazy(market_code=market_code, session=session)
+            code_info[market_code] = list_to_map(indices, 'stockCode')
 
-        code_info = list_to_map(indices, 'stockCode')
+        for config in MY_CODES:
+            market_code = config['market_code']
+            codes = config['codes']
+            indicator = config['indicator']
 
-        data = await get_indices_fundamental_lazy(INTERESTING_CODES, session=session)
-        for code, d in zip(INTERESTING_CODES, data):
-            info = code_info[code]
-            print('{}\t{}\t{}\t{}'.format(info['stockCode'], info['name'], MY_INDICATOR(d), data_date(d[0]['date'])))
+            data = await get_indices_fundamental_lazy(codes, market_code=market_code, session=session)
+            for code, d in zip(codes, data):
+                info = code_info[market_code][code]
+                print('{}\t{}\t{}\t{}'.format(info['stockCode'], info['name'], indicator(d), data_date(d[0]['date'])))
 
 
 if __name__ == '__main__':
