@@ -239,13 +239,17 @@ async def main():
 
         for config in MY_CODES:
             market_code = config['market_code']
-            codes = config['codes']
+            code_items = config['codes']
             indicator = config['indicator']
 
+            codes = [code_item[0] if isinstance(code_item, tuple) else code_item for code_item in code_items]
+
             data = await get_indices_fundamental_lazy(codes, market_code=market_code, session=session)
-            for code, d in zip(codes, data):
+            for code_item, d in zip(code_items, data):
+                code = code_item[0] if isinstance(code_item, tuple) else code_item
                 info = code_info[market_code][code]
-                print('{}\t{}\t{}\t{}'.format(info['stockCode'], info['name'], indicator(d), data_date(d[0]['date'])))
+                name = code_item[1] if isinstance(code_item, tuple) else info['name']
+                print('{}\t{}\t{}\t{}'.format(info['stockCode'], name, indicator(d), data_date(d[0]['date'])))
 
 
 if __name__ == '__main__':
